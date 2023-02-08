@@ -30,5 +30,7 @@ Input: model data, and stem data + define grouping factor (default=Stand) -> Run
 Data
 
 An example data set is provided with the code:
+
 ring_data.txt: contains ring-to-ring measurements sampled from 52 Norway spruces (Picea abies), at variable heights, coupled with tree-morphological features
+
 stem_data.txt: contains log-to-log dimensions used to calculate stem taper models to each stand in ringGradient.R (better solution will be added later)
