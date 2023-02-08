@@ -22,12 +22,13 @@ The repository contains two R-scripts:
 mainDriver.R
 ringGradients.R
 
-mainDriver.R is used to read in the ring property data, and fit linear mixed models for each wood property.
-ringGradient.R is called from the mainDriver.R, and uses ggplot2 to visualize the model predictions as within-tree gradients.
+mainDriver.R is used to read in the ring property data, and linear mixed models for each wood property.
+
+ringGradient.R is called from the mainDriver.R, and uses ggplot2 to visualize the model predictions as within-tree gradients. 
+Input: model data, and stem data + define grouping factor (default=Stand) -> Runs through all the groups specified for the data. (better solution will be added later)
 
 Data
 
 An example data set is provided with the code:
-model_data.txt
-
-It contains ring-to-ring measurements sampled from 52 Norway spruces (Picea abies), at variable heights.
+ring_data.txt: contains ring-to-ring measurements sampled from 52 Norway spruces (Picea abies), at variable heights, coupled with tree-morphological features
+stem_data.txt: contains log-to-log dimensions used to calculate stem taper models to each stand in ringGradient.R (better solution will be added later)
