@@ -2,8 +2,6 @@
 ##jiri.pyorala@helsinki.fi
 ##Research data and methods used in Pehkonen et al. (Manuscript) "How knot structure and stem geometry reflect ring properties in Norway spruce?"
 #https://osf.io/984tk/S
-.libPaths(c("/projappl/project_2003078/project_rpackages_4_1_1", .libPaths()))
-libpath <- .libPaths()[1]
 library(rsq)
 library(nlme)
 library(ggplot2)
@@ -64,7 +62,6 @@ for(f in levels(as.factor(stemdata$Stand))){
   
     }
   }
-save.image("/projappl/project_2003078/jpyorala/Scripts/ResearchData_Pehkonenetal23/.RData")
 
 #LIST OF KNOT FEATURES
 expl = c("Year", #Year             
@@ -111,7 +108,6 @@ ringdata = ringdata[!is.na(ringdata$buttH),]
 modeldata2 = knots2Rings(ringdata, group1="Stand", stemdata, knot_gradients)
 #write.table(modeldata2, "modeldata2.txt",  sep=" ", quote = F, append = F, row.names = F)
 #modeldata2 = read.delim("modeldata2.txt", header=T, sep=" ")
-save.image("/projappl/project_2003078/jpyorala/Scripts/ResearchData_Pehkonenetal23/.RData")
 
 ###FILTER DATA
 modeldata2_filt = subset(modeldata2, c(modeldata2$relH<=1&modeldata2$Hr>0&modeldata2$CA > 0))
@@ -125,7 +121,6 @@ modeldata2_filt$LWP=modeldata2_filt$LWP*100
 resp= c("CA", "RA", "LWP","RD")
 simpleMixedModel_results <- simpleMixedModels(resp, expl, model_data=modeldata2_filt)
 #write.table(results,"simpleMixedModel_results.txt",  sep=" ", quote = F, append = F, row.names = F)
-save.image("/projappl/project_2003078/jpyorala/Scripts/ResearchData_Pehkonenetal23/.RData")
 
 #INITIATE RING MODEL STRUCTURES: SEE mixedModels.R: multipleMixedModels()
 ringModel1 = function(H, DBH, h, d) 0 + relH + log(R)
@@ -277,5 +272,3 @@ for(f in levels(as.factor(modeldata2_filt$Stand))){
                  folder="Figures/")
   
 }
-
-save.image("/projappl/project_2003078/jpyorala/Scripts/ResearchData_Pehkonenetal23/.RData")
