@@ -26,42 +26,59 @@ knotModel1 = function(H, DBH, h, d) (h/H) + log(d/DBH)
 knotModel2 = function(H, DBH, h, d) (h/H) + log(d/DBH)
 knotModel3 = function(H, DBH, h, d) (H*DBH) + (h/H) + log(d/DBH) 
 
+#DEFINE COLOR FOR VISUALIZATION
+KI = na.exclude(stemdata[,"KnotIndex"])
+KI = KI[KI != Inf]
+KIcols = seq(0, 0.125, length=48) #%/100
+
+KSI = na.exclude(stemdata[,"KnotSizeIndex"])
+KSI = KSI[KSI != Inf]
+KSIcols = seq(0, 2.5, length=48) #cm3
+
+WTW = na.exclude(stemdata[,"KnotClusterDistanceAverage"])
+WTW = WTW[WTW != Inf]
+WTWcols = seq(0, 600, length=48) #mm
+
+
 #LOOP THROUGH STANDS AND TARGET VARIABLES: CREATE DxH GRADIENTS FOR EACH STAND AND VARIABLE 
 for(f in levels(as.factor(stemdata$Stand))){
   n=0
-  for(vrbl in c("KnotIndex","KnotSizeIndex","KnotClusterDistanceAverage")){
-    n=n+1
+   for(vrbl in c("KnotIndex","KnotSizeIndex","KnotClusterDistanceAverage")){
+     n=n+1
+     if(n==1){cols=KIcols}else if(n==2){cols=KSIcols}else{cols=WTWcols}
     #SUBSET DATA FOR THE SPECIFIC VARIABLE AND STAND, AND ORGANIZE INTO STEMS TO ENABLE FUNCTIONIZING BY H x D
     modeldata1 = organizeLogs(df = stemdata[stemdata$Stand==f,], vrbl = vrbl)
-    
+
     #REPARAMETERIZE THE STEM AND KNOT MODELS
     stemModel=lm(reld ~ poly(relh, 4), data=modeldata1)
     model=as.formula(paste(vrbl,
-                            paste(as.character(body(paste0("knotModel",n))), collapse=("+")), 
-                            sep="~"))
+                           paste(as.character(body(paste0("knotModel",n))), collapse=("+")),
+                           sep="~"))
     names(modeldata1)[names(modeldata1)=="vrbl"] <- vrbl
-    
+
     lmModel = lm(model, data=modeldata1)
     sm=summary(lmModel)
     knotModel_results = rbind(knotModel_results,
                               data.frame("Stand"=f, "vrbl" = vrbl, "R2"=sm$r.squared, "Sigma"=sm$sigma, "DF"=sm$df[2]))
-    
-    knot_gradients[[n]][[f]] <- woodGradient(DBH=max(modeldata1$DBH, na.rm=T), H=max(modeldata1$H, na.rm=T), 
-                                             stem=stemModel, model=lmModel, 
-                                             vrbl=vrbl, groupName=f)
-    
-    vrbl1 = na.exclude(stemdata[,vrbl])
-    vrbl1 = vrbl1[vrbl1 != Inf]
-    cols1 = seq(quantile(vrbl1, probs=0), quantile(vrbl1, probs=1), length=48)
 
-    gradientFigure(knot_gradients[[n]][[f]], f, 
+    ##CALCULATE THE GRADIENT TO A MATRIX
+    gradient <- woodGradient(DBH=max(modeldata1$DBH, na.rm=T), H=max(modeldata1$H, na.rm=T),
+                                             stem=stemModel, model=lmModel,
+                                             vrbl=vrbl, groupName=f)
+    #SAVE THE GRADIENT
+    knot_gradients[[n]][[f]] <- gradient
+    
+    #LITTLE CLEAN-UP AND VISUALIZATION
+    gradient[gradient>max(cols)] <- max(cols)
+    gradientFigure(gradient, f, 
                    vrbl=vrbl, 
-                   cols = cols1, 
-                   view=TRUE, 
-                   save=TRUE, folder="Figures/")
+                   cols = cols, 
+                   view=F, 
+                   save=F, folder="Figures/")
   
     }
   }
+
 
 #LIST OF KNOT FEATURES
 expl = c("Year", #Year             
@@ -104,13 +121,14 @@ expl = c("Year", #Year
 
 
 ringdata = ringdata[!is.na(ringdata$buttH),]
+
 ###CALCULATE KNOT FEATURES (AS ABOVE) TO RINGS
 modeldata2 = knots2Rings(ringdata, group1="Stand", stemdata, knot_gradients)
 #write.table(modeldata2, "modeldata2.txt",  sep=" ", quote = F, append = F, row.names = F)
 #modeldata2 = read.delim("modeldata2.txt", header=T, sep=" ")
 
 ###FILTER DATA
-modeldata2_filt = subset(modeldata2, c(modeldata2$relH<=1&modeldata2$Hr>0&modeldata2$CA > 0))
+modeldata2_filt = subset(modeldata2, c(modeldata2$relH<=1&modeldata2$Hr>0))
 modeldata2_filt = modeldata2_filt[complete.cases(modeldata2_filt),]
 modeldata2_filt$RD=modeldata2_filt$RD*1000
 modeldata2_filt$LWP=modeldata2_filt$LWP*100
@@ -120,7 +138,14 @@ modeldata2_filt$LWP=modeldata2_filt$LWP*100
 ######TEST STAND-LEVEL SIMPLE MIXED MODELS OF THE RESPONSE RING VARIABLES
 resp= c("CA", "RA", "LWP","RD")
 simpleMixedModel_results <- simpleMixedModels(resp, expl, model_data=modeldata2_filt)
-#write.table(results,"simpleMixedModel_results.txt",  sep=" ", quote = F, append = F, row.names = F)
+#write.table(simpleMixedModel_results,"simpleMixedModel_results.txt",  sep=" ", quote = F, append = F, row.names = F)
+#simpleMixedModel_results = read.delim("simpleMixedModel_results.txt", header=T, sep=" ")
+
+multipleMixedModel_results <- multipleMixedModels(model_data=modeldata2_filt)
+#write.table(multipleMixedModel_results,"multipleMixedModel_results.txt",  sep=" ", quote = F, append = F, row.names = F)
+#multipleMixedModel_results = read.delim("multipleMixedModel_results.txt", header=T, sep=" ")
+
+save.image("/projappl/project_2003078/jpyorala/Scripts/ResearchData_Pehkonenetal23/.RData")
 
 #INITIATE RING MODEL STRUCTURES: SEE mixedModels.R: multipleMixedModels()
 ringModel1 = function(H, DBH, h, d) 0 + relH + log(R)
@@ -150,37 +175,55 @@ ring_gradients = list(vector("list", 14),
 
 ringModel_results = data.frame("Stand"=character(), "vrbl" = character(), "R2"=double(), "Sigma"=double(), "DF"=double())
 
+#DEFINE COLORS FOR THE VISUALIZATION
+vrbl1 = na.exclude(modeldata2_filt[,"CA"])
+vrbl1 = vrbl1[vrbl1 != Inf]
+cols1 = seq(0, 120, length=48) #years
+
+vrbl2 = na.exclude(modeldata2_filt[,"RA"])
+vrbl2 = vrbl2[vrbl2 != Inf]
+cols2 = seq(0, 4200, length=48) #mm2
+
+vrbl3 = na.exclude(modeldata2_filt[,"LWP"])
+vrbl3 = vrbl3[vrbl3 != Inf]
+cols3 = seq(5, 60, length=48) #%
+
+vrbl4 = na.exclude(modeldata2_filt[,"RD"])
+vrbl4 = vrbl4[vrbl4 != Inf]
+cols4 = seq(250, 650, length=48) #kg/m3
+
 #LOOP THROUGH STANDS: VISUALIZE DxH GRADIENTS FOR EACH STAND AND VARIABLE 
 for(f in levels(as.factor(modeldata2_filt$Stand))){
 
   #SUBSET DATA FOR THE SPECIFIC STAND, AND REPARAMETERIZE STEM MODEL
   modeldata3 = organizeLogs(df = stemdata[stemdata$Stand==f,], vrbl = "Stand")
   stemModel=lm(reld ~ poly(relh, 4), data=modeldata3)
-  
+
   CA_lmModel = lm(CA_model, data=modeldata2_filt[modeldata2_filt$Stand==f,])
   sm=summary(CA_lmModel)
   ringModel_results = rbind(ringModel_results,
                             data.frame("Stand"=f, "vrbl" = "CA", "R2"=sm$r.squared, "Sigma"=sm$sigma, "DF"=sm$df[2]))
-  
-  ring_gradients[[1]][[f]] <- woodGradient(DBH=max(modeldata3$DBH, na.rm=T), 
+
+  ##CALCULATE THE GRADIENT TO A MATRIX
+  gradient <- woodGradient(DBH=max(modeldata3$DBH, na.rm=T),
                                            H=max(modeldata3$H, na.rm=T),
-                                           stem=stemModel, 
+                                           stem=stemModel,
                                            model=CA_lmModel,
-                                           vrbl="CA", 
+                                           vrbl="CA",
                                            groupName=f,
                                            logt=TRUE)
+  #SAVE THE GRADIENT
+  ring_gradients[[1]][[f]] <- gradient
   
-  vrbl1 = na.exclude(modeldata2_filt[,"CA"])
-  vrbl1 = vrbl1[vrbl1 != Inf]
-  vrbl1[vrbl1<1] <- 1
-  cols1 = seq(quantile(vrbl1, probs=0.001), quantile(vrbl1, probs=0.95), length=48)
-  ring_gradients[[1]][[f]][ring_gradients[[1]][[f]]<0]<-0
-
-  gradientFigure(ring_gradients[[1]][[f]], f, 
+  #LITTLE CLEAN-UP BEFORE THE VISUALIZATION
+  gradient[gradient<0]<-0
+  gradient[gradient>120]<-120
+  
+  gradientFigure(gradient, f, 
                  vrbl="CA", 
                  cols = cols1, 
-                 view=TRUE, 
-                 save=TRUE, 
+                 view=T, 
+                 save=T, 
                  folder="Figures/")
   
   
@@ -188,27 +231,26 @@ for(f in levels(as.factor(modeldata2_filt$Stand))){
   sm=summary(RA_lmModel)
   ringModel_results = rbind(ringModel_results,
                             data.frame("Stand"=f, "vrbl" = "RA", "R2"=sm$r.squared, "Sigma"=sm$sigma, "DF"=sm$df[2]))
-  
-  ring_gradients[[2]][[f]] <- woodGradient(DBH=max(modeldata3$DBH, na.rm=T), 
-                                           H=max(modeldata3$H, na.rm=T), 
-                                           stem=stemModel, 
-                                           model=RA_lmModel, 
-                                           vrbl="RA", 
+
+  gradient <- woodGradient(DBH=max(modeldata3$DBH, na.rm=T),
+                                           H=max(modeldata3$H, na.rm=T),
+                                           stem=stemModel,
+                                           model=RA_lmModel,
+                                           vrbl="RA",
                                            groupName=f,
                                            logt=TRUE,
                                            CA_grad = ring_gradients[[1]][[f]])
   
-  vrbl1 = na.exclude(modeldata2_filt[,"RA"])
-  vrbl1 = vrbl1[vrbl1 != Inf]
-  cols1 = seq(quantile(vrbl1, probs=0.001), quantile(vrbl1, probs=0.99), length=48)
-  ring_gradients[[2]][[f]][ring_gradients[[2]][[f]]<0]<-0
-  ring_gradients[[2]][[f]][ring_gradients[[2]][[f]]>quantile(vrbl1, probs=0.99)]<-quantile(vrbl1, probs=0.99)
+  ring_gradients[[2]][[f]]  <- gradient
   
-  gradientFigure(ring_gradients[[2]][[f]], f, 
+  gradient[gradient<0]<-0
+  gradient[gradient>4200]<-4200
+  
+  gradientFigure(gradient, f, 
                  vrbl="RA", 
-                 cols = cols1, 
-                 view=TRUE, 
-                 save=TRUE, 
+                 cols = cols2, 
+                 view=T, 
+                 save=T, 
                  folder="Figures/")
   
   
@@ -216,29 +258,27 @@ for(f in levels(as.factor(modeldata2_filt$Stand))){
   sm<-summary(LWP_lmModel)
   ringModel_results = rbind(ringModel_results,
                             data.frame("Stand"=f, "vrbl" = "LWP", "R2"=sm$r.squared, "Sigma"=sm$sigma, "DF"=sm$df[2]))
-  
-  ring_gradients[[3]][[f]] <- woodGradient(DBH=max(modeldata3$DBH, na.rm=T), 
-                                            H=max(modeldata3$H, na.rm=T), 
-                                            stem=stemModel, 
-                                            model=LWP_lmModel, 
-                                            vrbl="LWP", 
+
+  gradient <- woodGradient(DBH=max(modeldata3$DBH, na.rm=T),
+                                            H=max(modeldata3$H, na.rm=T),
+                                            stem=stemModel,
+                                            model=LWP_lmModel,
+                                            vrbl="LWP",
                                             groupName=f,
                                             logt=TRUE,
                                             CA_grad = ring_gradients[[1]][[f]],
                                             RA_grad = ring_gradients[[2]][[f]])
   
-  vrbl1 = na.exclude(modeldata2_filt[,"LWP"])
-  vrbl1 = vrbl1[vrbl1 != Inf]
-  #vrbl1[vrbl1<0] <- 0
-  cols1 = seq(0, 100, length=48)
-  ring_gradients[[3]][[f]][ring_gradients[[3]][[f]]<0]<-0
-  ring_gradients[[3]][[f]][ring_gradients[[3]][[f]]>100]<-100
+  ring_gradients[[3]][[f]] <- gradient
+  
+  gradient[gradient<5]<-5
+  gradient[gradient>60]<-60
 
-  gradientFigure(ring_gradients[[3]][[f]], f, 
+  gradientFigure(gradient, f, 
                  vrbl="LWP", 
-                 cols = cols1, 
-                 view=TRUE, 
-                 save=TRUE, 
+                 cols = cols3, 
+                 view=T, 
+                 save=T, 
                  folder="Figures/")
   
   
@@ -246,29 +286,31 @@ for(f in levels(as.factor(modeldata2_filt$Stand))){
   sm<-summary(RD_lmModel)
   ringModel_results = rbind(ringModel_results,
                             data.frame("Stand"=f, "vrbl" = "RD", "R2"=sm$r.squared, "Sigma"=sm$sigma, "DF"=sm$df[2]))
-  
-  ring_gradients[[4]][[f]] <- woodGradient(DBH=max(modeldata3$DBH, na.rm=T), 
-                                           H=max(modeldata3$H, na.rm=T), 
-                                           stem=stemModel, 
-                                           model=RD_lmModel, 
-                                           vrbl="RD", 
+
+  gradient <- woodGradient(DBH=max(modeldata3$DBH, na.rm=T),
+                                           H=max(modeldata3$H, na.rm=T),
+                                           stem=stemModel,
+                                           model=RD_lmModel,
+                                           vrbl="RD",
                                            groupName=f,
                                            logt=TRUE,
                                            CA_grad = ring_gradients[[1]][[f]],
                                            RA_grad = ring_gradients[[2]][[f]],
                                            LWP_grad = ring_gradients[[3]][[f]])
+
+  ring_gradients[[4]][[f]] <- gradient
   
-  vrbl1 = na.exclude(modeldata2_filt[,"RD"])
-  vrbl1 = vrbl1[vrbl1 != Inf]
-  cols1 = seq(quantile(vrbl1, probs=0), quantile(vrbl1, probs=1), length=48)
-  ring_gradients[[4]][[f]][ring_gradients[[4]][[f]]<quantile(vrbl1, probs=0)]<-quantile(vrbl1, probs=0)
-  ring_gradients[[4]][[f]][ring_gradients[[4]][[f]]>quantile(vrbl1, probs=1)]<-quantile(vrbl1, probs=1)
+  gradient[gradient<250]<-250
+  gradient[gradient>650]<-650
   
-  gradientFigure(ring_gradients[[4]][[f]], f, 
+  gradientFigure(gradient, f, 
                  vrbl="RD", 
-                 cols = cols1, 
-                 view=TRUE, 
-                 save=TRUE, 
+                 cols = cols4, 
+                 view=T, 
+                 save=T, 
                  folder="Figures/")
   
 }
+
+save.image(".RData")
+
