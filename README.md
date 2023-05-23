@@ -8,7 +8,7 @@ Installation
 
 Clone the repository to your computer:
 
-git clone https://github.com/jpyorala/ringGradients.git
+git clone https://github.com/jpyorala/woodGradients.git
 
 Install the following dependencies:
 nlme
